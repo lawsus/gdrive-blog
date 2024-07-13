@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body,
+        html {
+            display: flex;
+            justify-content: center;
+        }
+
+        .content-container {
+            width: 100vw;
+        }
+
+        .content img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        @media (max-width: 600px) {
+            .content-container {
+                padding-left: 5%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+</body>
+
+<body>
+    <div class="content-container">
+        <div class="content">
+            <main>
+                <h1>Admin</h1>
+                <p><a href="/">Home</a></p>
+                <form method="POST" action="{{ url_for('admin') }}">
+                    <ul>
+                        {% for post in posts %}
+                        <li>
+                            <input type="checkbox" name="post_ids" value="{{ post.id }}" id="post_{{ post.id }}">
+                            <label for="post_{{ post.id }}">{{ post.post_name }}</label>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <input type="submit" name="action" value="Delete">
+                </form>
+                <h2>Add / Update</h2>
+                <form method="POST" action="{{ url_for('update_posts') }}">
+                    <h3>Update Existing Posts</h3>
+                    {% for post in posts %}
+                    <div>
+                        <input type="checkbox" name="post_names" value="{{ post.post_name }}" id="update_{{ post.id }}">
+                        <label for="update_{{ post.id }}">{{ post.post_name }}</label>
+                    </div>
+                    {% endfor %}
+                    <h3>Add New or Update Multiple Posts</h3>
+                    <label for="csv_post_names">Enter comma-separated post names:</label>
+                    <input type="text" id="csv_post_names" name="csv_post_names" placeholder="post1, post2, post3">
+                    <input type="submit" value="Update Selected and CSV Input">
+                </form>
+            </main>
+        </div>
+    </div>
+</body>
+
+</html>

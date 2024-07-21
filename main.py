@@ -8,6 +8,7 @@ import io
 import os
 import pymysql
 import pymysql.cursors
+import re
 
 # SET FOLDER NAME
 folder_name = "<folder name>"
@@ -140,6 +141,8 @@ def post(post_name):
     name_without_extension = os.path.splitext(post_name)[0]
     words = name_without_extension.replace('-', ' ').split()
     formatted_title = ' '.join(word.capitalize() for word in words)
+    if formatted_title == "index":
+        formatted_title = "Home"
     if content:
         return render_template(
             "base.html", title=f"{folder_name} - {formatted_title}", content=content
@@ -147,7 +150,6 @@ def post(post_name):
     else:
         abort(404)
 
-# TODO: glink doesn't properly process external links
 def process_glink(html_content):
     start_tag = "&lt;glink&gt;"
     end_tag = "&lt;/glink&gt;"
@@ -157,12 +159,16 @@ def process_glink(html_content):
         return ""
     if start_index > len(start_tag) - 1 and end_index > -1:
         glink_content = html_content[start_index:end_index].strip()
-        first_amp = glink_content.find("&")
+        first_amp = glink_content.find("&nbsp")
         last_semi = glink_content.rfind(";")
         if first_amp > -1 and last_semi > -1:
             path = glink_content[:first_amp]
-            name = glink_content[last_semi + 1 :]
-            replacement = f'<a href="{path}">{name}</a>'
+            clean_path = re.sub(r"<[^>]*>", "", path)
+            name = glink_content[first_amp:]
+            name = re.sub(r"<[^>]*>", "", name)
+            last_semi = name.rfind(";")
+            clean_name = name[last_semi + 1:]
+            replacement = f'<a href="{clean_path}">{clean_name}</a>'
             return (
                 html_content[: start_index - len(start_tag)]
                 + replacement
@@ -171,36 +177,14 @@ def process_glink(html_content):
 
     return html_content
 
-
-def process_gimage(html_content):
-    start_tag = "&lt;gimage&gt;"
-    end_tag = "&lt;/gimage&gt;"
-    start_index = html_content.find(start_tag) + len(start_tag)
-    end_index = html_content.find(end_tag)
-    if end_index == -1:
-        return ""
-    if start_index > len(start_tag) - 1 and end_index > -1:
-        image_link = html_content[start_index:end_index].strip()
-        replacement = f'<img src="{image_link}"/>'
-        return (
-            html_content[: start_index - len(start_tag)]
-            + replacement
-            + html_content[end_index + len(end_tag) :]
-        )
-    return html_content
-
-
 def process_html(html_content):
     while True:
         if (
             html_content.find("&lt;glink&gt;") == -1
-            and html_content.find("&lt;gimage&gt;") == -1
         ):
             break
         if html_content.find("&lt;glink&gt;") != -1:
             html_content = process_glink(html_content)
-        if html_content.find("&lt;gimage&gt;") != -1:
-            html_content = process_gimage(html_content)
     return html_content
 
 

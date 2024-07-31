@@ -1,0 +1,8 @@
+FOLDER_NAME = "folder-name"
+ADMIN_NAME = "admin-name"
+ADMIN_PASSWORD = "admin-password"
+SERVICE_ACCOUNT_FILE = "service-account-file"
+DB_HOST = "db-host"
+DB_USER = "db-user"
+DB_PASSWORD = "db-password"
+DB_NAME = "db-name"

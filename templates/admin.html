@@ -1,71 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
     <style>
-        body,
-        html {
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .admin-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .admin-title {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .home-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .file-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .file-item {
+            margin-bottom: 10px;
             display: flex;
-            justify-content: center;
+            align-items: center;
+        }
+        .file-name {
+            margin-left: 10px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
         }
 
-        .content-container {
-            width: 100vw;
+        .delete-btn {
+            background-color: #ff4136;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            margin-right: 10px;
         }
-
-        .content img {
-            max-width: 100%;
-            height: auto;
+        .delete-btn:hover {
+            background-color: #d50000;
         }
-
-        @media (max-width: 600px) {
-            .content-container {
-                padding-left: 5%;
-            }
+        .refresh-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 12px;
+        }
+        .refresh-btn:hover {
+            background-color: #45a049;
+        }
+        .delete-all-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .delete-all-btn:hover {
+            background-color: #d32f2f;
         }
     </style>
 </head>
-
 <body>
-</body>
+    <div class="admin-container">
+        <h1 class="admin-title">Admin Panel</h1>
+        <a href="{{ url_for('index') }}" class="home-link">Home</a>
+        <h2>Files</h2>
+        <ul class="file-list">
+        {% for file in files %}
+            <li class="file-item">
+                <form method="POST" action="{{ url_for('admin') }}" class="file-form">
+                    <input type="hidden" name="post_name" value="{{ file.name }}">
+                    <input type="hidden" name="action" value="">
+                    <label class="switch">
+                        <input type="checkbox" {% if file.active %}checked{% endif %} onchange="toggleFile(this)">
+                        <span class="slider round"></span>
+                    </label>
+                    <button type="button" onclick="refreshFile(this)" class="refresh-btn">↻</button>
+                    <span class="file-name">{{ file.name }}</span>
+                </form>
+            </li>
+        {% endfor %}
+        </ul>
 
-<body>
-    <div class="content-container">
-        <div class="content">
-            <main>
-                <h1>Admin</h1>
-                <p><a href="/">Home</a></p>
+        <h2>Orphaned Files (In Database Only)</h2>
+        <form method="POST" action="{{ url_for('admin') }}">
+            <button type="submit" name="action" value="delete_all_orphaned" class="delete-all-btn" onclick="return confirm('Are you sure you want to delete all orphaned files?')">Delete All Orphaned Files</button>
+        </form>
+        <ul class="file-list">
+        {% for file in orphaned_files %}
+            <li class="file-item">
                 <form method="POST" action="{{ url_for('admin') }}">
-                    <ul>
-                        {% for post in posts %}
-                        <li>
-                            <input type="checkbox" name="post_ids" value="{{ post.id }}" id="post_{{ post.id }}">
-                            <label for="post_{{ post.id }}">{{ post.post_name }}</label>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    <input type="submit" name="action" value="Delete">
+                    <input type="hidden" name="post_name" value="{{ file.name }}">
+                    <button type="submit" name="action" value="delete" class="delete-btn" onclick="return confirm('Are you sure you want to delete this orphaned file?')">×</button>
+                    <span class="file-name">{{ file.name }} (Orphaned)</span>
                 </form>
-                <h2>Add / Update</h2>
-                <form method="POST" action="{{ url_for('update_posts') }}">
-                    <h3>Update Existing Posts</h3>
-                    {% for post in posts %}
-                    <div>
-                        <input type="checkbox" name="post_names" value="{{ post.post_name }}" id="update_{{ post.id }}">
-                        <label for="update_{{ post.id }}">{{ post.post_name }}</label>
-                    </div>
-                    {% endfor %}
-                    <h3>Add New or Update Multiple Posts</h3>
-                    <label for="csv_post_names">Enter comma-separated post names:</label>
-                    <input type="text" id="csv_post_names" name="csv_post_names" placeholder="post1, post2, post3">
-                    <input type="submit" value="Update Selected and CSV Input">
-                </form>
-            </main>
-        </div>
+            </li>
+        {% endfor %}
+        </ul>
     </div>
-</body>
 
+    <script>
+        function toggleFile(checkbox) {
+            var form = checkbox.closest('form');
+            form.action.value = checkbox.checked ? 'activate' : 'deactivate';
+            form.submit();
+        }
+
+        function refreshFile(button) {
+            var form = button.closest('form');
+            form.action.value = 'refresh';
+            form.submit();
+        }
+    </script>
+</body>
 </html>

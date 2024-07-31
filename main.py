@@ -9,21 +9,25 @@ import os
 import pymysql
 import pymysql.cursors
 import re
+from dotenv import load_dotenv
 
-# SET FOLDER NAME
-folder_name = "<folder name>"
+# ADD ENVIRONMENT PATH
+env_path = "<env path>"
+load_dotenv(env_path)
+
+folder_name = os.getenv("FOLDER_NAME")
 
 app = Flask(__name__)
 
 # SET UP AUTH FOR ADMIN
-app.config["BASIC_AUTH_USERNAME"] = "<admin username>"
-app.config["BASIC_AUTH_PASSWORD"] = "<admin password>"
+app.config["BASIC_AUTH_USERNAME"] = os.getenv("ADMIN_NAME")
+app.config["BASIC_AUTH_PASSWORD"] = os.getenv("ADMIN_PASSWORD")
 app.config["BASIC_AUTH_FORCE"] = False  # We only want to force auth on specific routes
 basic_auth = BasicAuth(app)
 
 # SET UP GOOGLE DRIVE CREDENTIALS
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-SERVICE_ACCOUNT_FILE = "<path to service account key json>"
+SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE")
 credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES
 )
@@ -31,10 +35,10 @@ drive_service = build("drive", "v3", credentials=credentials)
 
 # SET UP DATABASE
 db_config = {
-    "host": "<database host>",
-    "user": "<database user>",
-    "password": "<database password>",
-    "db": "<database name>",
+    "host": os.getenv("DB_HOST"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "db": os.getenv("DB_NAME"),
     "cursorclass": pymysql.cursors.DictCursor,
 }
 
@@ -125,7 +129,7 @@ def get_file_content(post_name):
 # INDEX.HTML ROUTE
 @app.route("/")
 def index():
-    content = get_file_content("index.html")
+    content = get_file_content("index")
     if content:
         return render_template(
             "base.html", title=f"{folder_name} - Home", content=content
@@ -187,60 +191,86 @@ def process_html(html_content):
             html_content = process_glink(html_content)
     return html_content
 
+# Fetch all files from the Google Drive folder
+def get_all_files_from_drive():
+    results = drive_service.files().list(
+        q=f"'{folder_id}' in parents and trashed=false",
+        spaces="drive",
+        fields="files(id, name, mimeType, modifiedTime)",
+        orderBy="modifiedTime desc"
+    ).execute()
+    return results.get('files', [])
 
-# ADMIN ROUTE
+# Modify the admin route
 @app.route("/admin", methods=["GET", "POST"])
-@basic_auth.required  # This decorator enforces basic authentication
+@basic_auth.required
 def admin():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, post_name FROM bp;")
-    posts = cursor.fetchall()
-    conn.close()
+    
+    # Fetch all files from Google Drive
+    drive_files = get_all_files_from_drive()
+    
+    # Fetch all posts from the database
+    cursor.execute("SELECT post_name FROM bp;")
+    db_posts = {row['post_name'] for row in cursor.fetchall()}
+    
+    # Combine information
+    files_info = []
+    for file in drive_files:
+        if file['mimeType'] == 'application/vnd.google-apps.document':
+            files_info.append({
+                'name': file['name'],
+                'active': file['name'] in db_posts,
+                'in_drive': True
+            })
+    
+    # Add files that are in the database but not in Google Drive
+    orphaned_files = []
+    for post_name in db_posts:
+        if post_name not in [file['name'] for file in files_info]:
+            orphaned_files.append({
+                'name': post_name,
+                'active': True,
+                'in_drive': False
+            })
 
     if request.method == "POST":
-        if request.form.get("action") == "Delete":
-            post_ids = request.form.getlist("post_ids")
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            for post_id in post_ids:
-                cursor.execute("DELETE FROM bp WHERE id = %s;", (post_id,))
+        post_name = request.form.get("post_name")
+        action = request.form.get("action")
+        
+        if action == "activate":
+            content = fetch_file_content(post_name)
+            if content is not None:
+                insstr = """
+                    INSERT INTO bp (post_name, content)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        content = VALUES(content);
+                """
+                cursor.execute(insstr, (post_name, content))
+                conn.commit()
+        elif action == "deactivate":
+            cursor.execute("DELETE FROM bp WHERE post_name = %s;", (post_name,))
             conn.commit()
-            conn.close()
-            return redirect(url_for("admin"))
+        elif action == "delete":
+            cursor.execute("DELETE FROM bp WHERE post_name = %s;", (post_name,))
+            conn.commit()
+        elif action == "refresh":
+            content = fetch_file_content(post_name)
+            if content is not None:
+                cursor.execute("UPDATE bp SET content = %s WHERE post_name = %s;", (content, post_name))
+                conn.commit()
+        elif action == "delete_all_orphaned":
+            drive_file_names = [file['name'] for file in drive_files if file['mimeType'] == 'application/vnd.google-apps.document']
+            cursor.execute("DELETE FROM bp WHERE post_name NOT IN %s;", (drive_file_names,))
+            conn.commit()
+        
+        conn.close()
+        return redirect(url_for("admin"))
 
-    return render_template("admin.html", title=f"{folder_name} - Admin", posts=posts)
-
-
-# ADMIN UPDATE API
-@app.route("/admin/update", methods=["POST"])
-def update_posts():
-    post_names = request.form.getlist("post_names")
-    csv_post_names = request.form.get("csv_post_names", "")
-
-    # Add post names from CSV input
-    if csv_post_names:
-        post_names.extend([name.strip() for name in csv_post_names.split(",")])
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    for post_name in post_names:
-        content = fetch_file_content(post_name)
-        if content is not None:
-            insstr = """
-                INSERT INTO bp (post_name, content)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE
-                    content = VALUES(content);
-            """
-            cursor.execute(insstr, (post_name, content))
-
-    conn.commit()
     conn.close()
-
-    return redirect(url_for("admin"))
-
+    return render_template("admin.html", title=f"{folder_name} - Admin", files=files_info, orphaned_files=orphaned_files)
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

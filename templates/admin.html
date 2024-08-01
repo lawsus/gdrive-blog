@@ -81,33 +81,34 @@
             transform: translateX(20px);
         }
 
-        .delete-btn {
-            background-color: #ff4136;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 16px;
-            line-height: 1;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        .delete-btn:hover {
-            background-color: #d50000;
-        }
-        .refresh-btn {
-            background-color: #4CAF50;
-            color: white;
+        .btn {
             border: none;
             border-radius: 4px;
             padding: 5px 10px;
             cursor: pointer;
-            margin-left: 10px;
+            margin-right: 10px;
             font-size: 12px;
+            color: white;
+            display: inline-block;
+            text-decoration: none;
+        }
+        .refresh-btn {
+            background-color: #4CAF50;
         }
         .refresh-btn:hover {
             background-color: #45a049;
+        }
+        .view-btn {
+            background-color: #007bff;
+        }
+        .view-btn:hover {
+            background-color: #0056b3;
+        }
+        .delete-btn {
+            background-color: #ff4136;
+        }
+        .delete-btn:hover {
+            background-color: #d50000;
         }
         .delete-all-btn {
             background-color: #f44336;
@@ -120,6 +121,9 @@
         }
         .delete-all-btn:hover {
             background-color: #d32f2f;
+        }
+        a.view-link {
+            text-decoration: none;
         }
     </style>
 </head>
@@ -138,7 +142,8 @@
                         <input type="checkbox" {% if file.active %}checked{% endif %} onchange="toggleFile(this)">
                         <span class="slider round"></span>
                     </label>
-                    <button type="button" onclick="refreshFile(this)" class="refresh-btn">↻</button>
+                    <button type="button" onclick="refreshFile(this)" class="btn refresh-btn">Refresh</button>
+                    <a href="{{ file.web_view_link }}" target="_blank" class="btn view-btn">View</a>
                     <span class="file-name">{{ file.name }}</span>
                 </form>
             </li>
@@ -154,7 +159,7 @@
             <li class="file-item">
                 <form method="POST" action="{{ url_for('admin') }}">
                     <input type="hidden" name="post_name" value="{{ file.name }}">
-                    <button type="submit" name="action" value="delete" class="delete-btn" onclick="return confirm('Are you sure you want to delete this orphaned file?')">×</button>
+                    <button type="submit" name="action" value="delete" class="btn delete-btn" onclick="return confirm('Are you sure you want to delete this orphaned file?')">Delete</button>
                     <span class="file-name">{{ file.name }} (Orphaned)</span>
                 </form>
             </li>

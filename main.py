@@ -196,7 +196,7 @@ def get_all_files_from_drive():
     results = drive_service.files().list(
         q=f"'{folder_id}' in parents and trashed=false",
         spaces="drive",
-        fields="files(id, name, mimeType, modifiedTime)",
+        fields="files(id, name, mimeType, modifiedTime, webViewLink)",
         orderBy="modifiedTime desc"
     ).execute()
     return results.get('files', [])
@@ -222,7 +222,8 @@ def admin():
             files_info.append({
                 'name': file['name'],
                 'active': file['name'] in db_posts,
-                'in_drive': True
+                'in_drive': True,
+                'web_view_link': file.get('webViewLink', '#')
             })
     
     # Add files that are in the database but not in Google Drive
